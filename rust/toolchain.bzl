@@ -558,6 +558,7 @@ def _rust_toolchain_impl(ctx):
             ))
 
     experimental_link_std_dylib = _experimental_link_std_dylib(ctx)
+    link_self_contained = ctx.attr._link_self_contained[BuildSettingInfo].value
 
     def make_ccinfo(label, actions, allocator_library, std):
         return make_libstd_and_allocator_ccinfo(
@@ -566,6 +567,7 @@ def _rust_toolchain_impl(ctx):
             label = label,
             actions = actions,
             experimental_link_std_dylib = experimental_link_std_dylib,
+            link_self_contained = link_self_contained,
             rust_std = rust_std,
             allocator_library = allocator_library,
             std = std,
@@ -649,6 +651,7 @@ def _rust_toolchain_impl(ctx):
         _codegen_units = ctx.attr._codegen_units[BuildSettingInfo].value,
         _experimental_use_allocator_libraries_with_mangled_symbols = ctx.attr.experimental_use_allocator_libraries_with_mangled_symbols,
         _experimental_use_allocator_libraries_with_mangled_symbols_setting = ctx.attr._experimental_use_allocator_libraries_with_mangled_symbols_setting[BuildSettingInfo].value,
+        _link_self_contained = link_self_contained,
     )
     return [
         toolchain,
@@ -903,6 +906,14 @@ rust_toolchain = rule(
         "_incompatible_do_not_include_transitive_data_in_compile_inputs": attr.label(
             default = Label("//rust/settings:incompatible_do_not_include_transitive_data_in_compile_inputs"),
             doc = "Label to a boolean build setting that controls whether to include transitive data dependencies in compile inputs.",
+        ),
+        "_link_self_contained": attr.label(
+            default = Label("//rust/settings:link_self_contained"),
+            doc = (
+                "Label to a boolean build setting that controls whether to link Rust's self-contained CRT objects. " +
+                "Auto-disabled when Zig CC toolchain is detected (via -Clink-self-contained=no rustc flag). " +
+                "Can be manually set to False for other hermetic toolchains."
+            ),
         ),
         "_linker_preference": attr.label(
             default = Label("//rust/settings:toolchain_linker_preference"),
