@@ -46,7 +46,8 @@ def make_libstd_and_allocator_ccinfo(
         experimental_link_std_dylib,
         rust_std,
         allocator_library,
-        std = "std"):
+        std = "std",
+        link_self_contained = True):
     """Make the CcInfo (if possible) for libstd and allocator libraries.
 
     Args:
@@ -62,7 +63,9 @@ def make_libstd_and_allocator_ccinfo(
           * an allocator_libraries_impl_info field, which should be None or of type AllocatorLibrariesImplInfo.
         std: Standard library flavor. Currently only "std" and "no_std_with_alloc" are supported,
              accompanied with the default panic behavior.
-
+        link_self_contained (boolean): Whether to link Rust's self-contained CRT objects (crt1.o, crti.o, etc.).
+            Set to False when using hermetic C/C++ toolchains like Zig for cross-compilation to avoid
+            duplicate symbol errors.
 
     Returns:
         A CcInfo object for the required libraries, or None if no such libraries are available.
@@ -82,7 +85,11 @@ def make_libstd_and_allocator_ccinfo(
         """).format(label, rust_std))
     rust_stdlib_info = rust_std[rust_common.stdlib_info]
 
-    if rust_stdlib_info.self_contained_files:
+    # Only link self-contained CRT objects if link_self_contained is True.
+    # When using hermetic C/C++ toolchains like Zig for cross-compilation,
+    # these objects can conflict with the toolchain's own CRT objects,
+    # causing duplicate symbol errors.
+    if link_self_contained and rust_stdlib_info.self_contained_files:
         compilation_outputs = cc_common.create_compilation_outputs(
             objects = depset(rust_stdlib_info.self_contained_files),
         )

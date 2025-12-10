@@ -560,6 +560,30 @@ def codegen_units():
         build_setting_default = -1,
     )
 
+def link_self_contained():
+    """A flag to control whether to link Rust's self-contained CRT objects (crt1.o, crti.o, etc.).
+
+    When using hermetic C/C++ toolchains like Zig (hermetic_cc_toolchain) for cross-compilation,
+    Rust's self-contained CRT objects can conflict with the toolchain's own CRT objects, causing
+    duplicate symbol errors during linking.
+
+    **Auto-detection**: When using Zig's CC toolchain (detected by "zig" in the compiler
+    executable path), `-Clink-self-contained=no` is automatically passed to rustc, so no
+    manual configuration is needed for Zig users.
+
+    For other hermetic toolchains, set this to False manually:
+        --@rules_rust//rust/settings:link_self_contained=false
+
+    When set to False (or auto-detected as Zig), passes `-Clink-self-contained=no` to rustc,
+    which tells rustc not to use its bundled CRT objects.
+
+    Default is True (use rustc's self-contained objects), but auto-disabled for Zig.
+    """
+    bool_flag(
+        name = "link_self_contained",
+        build_setting_default = True,
+    )
+
 # buildifier: disable=unnamed-macro
 def collect_cfgs():
     """Enable collection of cfg flags with results stored in CrateInfo.cfgs.

@@ -1206,7 +1206,7 @@ def construct_arguments(
     if hasattr(ctx.attr, "_extra_exec_rustc_env") and is_exec_configuration(ctx):
         env.update(ctx.attr._extra_exec_rustc_env[ExtraExecRustcEnvInfo].extra_exec_rustc_env)
 
-    rustc_flags.add_all(collect_extra_rustc_flags(ctx, toolchain, crate_info.root, crate_info.type), map_each = map_flag)
+    rustc_flags.add_all(collect_extra_rustc_flags(ctx, toolchain, crate_info.root, crate_info.type, cc_toolchain), map_each = map_flag)
 
     if is_no_std(ctx, toolchain, crate_info.is_test):
         rustc_flags.add('--cfg=feature="no_std"')
@@ -1236,7 +1236,26 @@ def construct_arguments(
 
     return args, env
 
-def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type):
+def _is_zig_cc_toolchain(cc_toolchain):
+    """Check if the CC toolchain is Zig-based.
+
+    Args:
+        cc_toolchain: The CcToolchainInfo provider.
+
+    Returns:
+        bool: True if the toolchain appears to be Zig-based.
+    """
+    if not cc_toolchain:
+        return False
+
+    # Check compiler executable path for "zig"
+    compiler_executable = getattr(cc_toolchain, "compiler_executable", None)
+    if compiler_executable and "zig" in compiler_executable:
+        return True
+
+    return False
+
+def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type, cc_toolchain = None):
     """Gather all 'extra' rustc flags from the target's attributes and toolchain.
 
     Args:
@@ -1244,11 +1263,24 @@ def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type):
         toolchain (rust_toolchain): The current Rust toolchain.
         crate_root (File): The root file of the crate.
         crate_type (str): The crate type.
+        cc_toolchain: The CcToolchainInfo provider (optional).
 
     Returns:
         List[str]: Extra rustc flags.
     """
     flags = []
+
+    # Auto-detect Zig toolchain and disable self-contained linking.
+    # Zig provides its own CRT objects, so linking Rust's self-contained
+    # objects causes duplicate symbol errors.
+    # Check the build setting first - if explicitly set to False, always disable.
+    # If True (default), auto-detect Zig and disable if detected.
+    link_self_contained = toolchain._link_self_contained
+    if link_self_contained and _is_zig_cc_toolchain(cc_toolchain):
+        link_self_contained = False
+
+    if not link_self_contained:
+        flags.append("-Clink-self-contained=no")
 
     if crate_type in toolchain.extra_rustc_flags_for_crate_types.keys():
         flags.extend(toolchain.extra_rustc_flags_for_crate_types[crate_type])
