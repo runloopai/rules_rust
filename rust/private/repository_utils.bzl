@@ -946,6 +946,14 @@ def load_arbitrary_tool(
         if not sha256:
             sha256 = result.sha256
 
+    # On macOS, strip the quarantine attribute from downloaded files to prevent
+    # Gatekeeper "Verifying" notifications when the toolchain is first used.
+    if ctx.os.name == "mac os x":
+        ctx.execute(
+            ["xattr", "-dr", "com.apple.quarantine", "."],
+            quiet = True,
+        )
+
     # If the artifact is reproducibly downloadable then return an
     # empty dict to inform consumers no attributes require updating.
     if is_reproducible:
