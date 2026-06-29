@@ -438,7 +438,14 @@ def _cargo_build_script_impl(ctx):
 
     # Pull in env vars which may be required for the cc_toolchain to work (e.g. on OSX, the SDK version).
     # We hope that the linker env is sufficient for the whole cc_toolchain.
-    cc_toolchain, feature_configuration = find_cc_toolchain(ctx)
+    #
+    # Disable coverage instrumentation for the C/C++ that build scripts compile
+    # from source (e.g. *-sys crates). Such code is third-party and not a target
+    # of coverage; instrumenting it embeds LLVM profile records whose layout does
+    # not match the rustc profile runtime that links the final binary, crashing
+    # __llvm_profile_write_file at exit. This mirrors how fdo_instrument/
+    # fdo_optimize are already excluded for build-script compiles.
+    cc_toolchain, feature_configuration = find_cc_toolchain(ctx, extra_unsupported_features = ["coverage"])
     linker, _, link_args, linker_env = get_linker_and_args(ctx, "bin", toolchain, cc_toolchain, feature_configuration, None)
     env.update(**linker_env)
     env["LD"] = linker
