@@ -24,6 +24,18 @@ load(
 )
 load("//rust/settings:incompatible.bzl", "IncompatibleFlagInfo")
 
+def _is_zig_cc_toolchain(cc_toolchain):
+    if not cc_toolchain:
+        return False
+
+    compiler_executable = getattr(cc_toolchain, "compiler_executable", None)
+    return bool(compiler_executable) and "zig" in compiler_executable
+
+def _effective_link_self_contained(link_self_contained, is_zig_cc_toolchain, target_abi):
+    return link_self_contained and not (is_zig_cc_toolchain and target_abi == "musl")
+
+effective_link_self_contained_for_testing = _effective_link_self_contained
+
 def _rust_stdlib_filegroup_impl(ctx):
     rust_std = ctx.files.srcs
     dot_a_files = []
@@ -560,6 +572,12 @@ def _rust_toolchain_impl(ctx):
                 ctx.label,
             ))
 
+    link_self_contained = _effective_link_self_contained(
+        ctx.attr._link_self_contained[BuildSettingInfo].value,
+        _is_zig_cc_toolchain(cc_toolchain),
+        target_abi,
+    )
+
     def make_ccinfo(label, actions, allocator_library, std, link_std_dylib):
         return make_libstd_and_allocator_ccinfo(
             cc_toolchain = cc_toolchain,
@@ -567,6 +585,7 @@ def _rust_toolchain_impl(ctx):
             label = label,
             actions = actions,
             link_std_dylib = link_std_dylib,
+            link_self_contained = link_self_contained,
             rust_std = rust_std,
             allocator_library = allocator_library,
             std = std,
@@ -663,6 +682,7 @@ def _rust_toolchain_impl(ctx):
         _codegen_units = ctx.attr._codegen_units[BuildSettingInfo].value,
         _experimental_use_allocator_libraries_with_mangled_symbols = ctx.attr.experimental_use_allocator_libraries_with_mangled_symbols,
         _experimental_use_allocator_libraries_with_mangled_symbols_setting = ctx.attr._experimental_use_allocator_libraries_with_mangled_symbols_setting[BuildSettingInfo].value,
+        _link_self_contained = link_self_contained,
     )
     return [
         toolchain,
@@ -931,6 +951,10 @@ rust_toolchain = rule(
         "_link_std_dylib_setting": attr.label(
             default = Label("@rules_rust//rust/settings:experimental_link_std_dylib"),
             doc = "Label to a boolean build setting that controls whether to link libstd dynamically.",
+        ),
+        "_link_self_contained": attr.label(
+            default = Label("//rust/settings:link_self_contained"),
+            doc = "Controls whether Rust links its self-contained CRT objects.",
         ),
         "_linker_preference": attr.label(
             default = Label("//rust/settings:toolchain_linker_preference"),

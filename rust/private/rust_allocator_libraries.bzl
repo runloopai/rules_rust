@@ -46,7 +46,8 @@ def make_libstd_and_allocator_ccinfo(
         link_std_dylib,
         rust_std,
         allocator_library,
-        std = "std"):
+        std = "std",
+        link_self_contained = True):
     """Make the CcInfo (if possible) for libstd and allocator libraries.
 
     Args:
@@ -62,6 +63,7 @@ def make_libstd_and_allocator_ccinfo(
           * an allocator_libraries_impl_info field, which should be None or of type AllocatorLibrariesImplInfo.
         std: Standard library flavor. Currently only "std" and "no_std_with_alloc" are supported,
              accompanied with the default panic behavior.
+        link_self_contained (boolean): Whether to link Rust's self-contained CRT objects.
 
 
     Returns:
@@ -85,7 +87,7 @@ def make_libstd_and_allocator_ccinfo(
     if link_std_dylib and (not rust_stdlib_info.std_dylib or not cc_toolchain):
         return None
 
-    if rust_stdlib_info.self_contained_files:
+    if link_self_contained and rust_stdlib_info.self_contained_files:
         compilation_outputs = cc_common.create_compilation_outputs(
             objects = depset(rust_stdlib_info.self_contained_files),
         )
