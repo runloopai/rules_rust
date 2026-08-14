@@ -390,7 +390,7 @@ def get_linker_and_args(ctx, crate_type, toolchain, cc_toolchain, feature_config
 
     Returns:
         tuple: A tuple of the following items:
-            - (str): The tool path for given action.
+            - (File or str): The tool for the action, or its path when provided by the C++ toolchain.
             - (bool): Whether or not the linker is a direct driver (e.g. `ld`) vs a wrapper (e.g. `gcc`).
             - (sequence): A flattened command line flags for given action.
             - (dict): Environment variables to be set for given action.
@@ -445,7 +445,7 @@ def get_linker_and_args(ctx, crate_type, toolchain, cc_toolchain, feature_config
         ld_is_direct_driver = False
 
     if not ld or toolchain.linker_preference == "rust":
-        ld = toolchain.linker.path
+        ld = toolchain.linker
         ld_is_direct_driver = toolchain.linker_type == "direct"
 
         # Make sure we include RPATHs for Rust ABI dylibs even when no cc_toolchain.
