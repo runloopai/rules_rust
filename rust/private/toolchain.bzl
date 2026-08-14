@@ -24,6 +24,18 @@ load(
 )
 load("//rust/settings:incompatible.bzl", "IncompatibleFlagInfo")
 
+def _is_zig_cc_toolchain(cc_toolchain):
+    if not cc_toolchain:
+        return False
+
+    compiler_executable = getattr(cc_toolchain, "compiler_executable", None)
+    return bool(compiler_executable) and "zig" in compiler_executable
+
+def _effective_link_self_contained(link_self_contained, is_zig_cc_toolchain, target_abi):
+    return link_self_contained and not (is_zig_cc_toolchain and target_abi == "musl")
+
+effective_link_self_contained_for_testing = _effective_link_self_contained
+
 def _rust_stdlib_filegroup_impl(ctx):
     rust_std = ctx.files.srcs
     dot_a_files = []
@@ -556,6 +568,11 @@ def _rust_toolchain_impl(ctx):
             ))
 
     experimental_link_std_dylib = _experimental_link_std_dylib(ctx)
+    link_self_contained = _effective_link_self_contained(
+        ctx.attr._link_self_contained[BuildSettingInfo].value,
+        _is_zig_cc_toolchain(cc_toolchain),
+        target_abi,
+    )
 
     def make_ccinfo(label, actions, allocator_library, std):
         return make_libstd_and_allocator_ccinfo(
@@ -564,6 +581,7 @@ def _rust_toolchain_impl(ctx):
             label = label,
             actions = actions,
             experimental_link_std_dylib = experimental_link_std_dylib,
+            link_self_contained = link_self_contained,
             rust_std = rust_std,
             allocator_library = allocator_library,
             std = std,
@@ -655,6 +673,7 @@ def _rust_toolchain_impl(ctx):
         _codegen_units = ctx.attr._codegen_units[BuildSettingInfo].value,
         _experimental_use_allocator_libraries_with_mangled_symbols = ctx.attr.experimental_use_allocator_libraries_with_mangled_symbols,
         _experimental_use_allocator_libraries_with_mangled_symbols_setting = ctx.attr._experimental_use_allocator_libraries_with_mangled_symbols_setting[BuildSettingInfo].value,
+        _link_self_contained = link_self_contained,
     )
     return [
         toolchain,
@@ -912,6 +931,10 @@ rust_toolchain = rule(
         "_incompatible_do_not_include_transitive_data_in_compile_inputs": attr.label(
             default = Label("//rust/settings:incompatible_do_not_include_transitive_data_in_compile_inputs"),
             doc = "Label to a boolean build setting that controls whether to include transitive data dependencies in compile inputs.",
+        ),
+        "_link_self_contained": attr.label(
+            default = Label("//rust/settings:link_self_contained"),
+            doc = "Controls whether Rust links its self-contained CRT objects.",
         ),
         "_linker_preference": attr.label(
             default = Label("//rust/settings:toolchain_linker_preference"),

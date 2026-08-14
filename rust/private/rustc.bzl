@@ -1560,6 +1560,9 @@ def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type):
     """
     flags = []
 
+    if not toolchain._link_self_contained:
+        flags.append("-Clink-self-contained=no")
+
     if crate_type in toolchain.extra_rustc_flags_for_crate_types.keys():
         flags.extend(toolchain.extra_rustc_flags_for_crate_types[crate_type])
 

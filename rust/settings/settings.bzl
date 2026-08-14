@@ -567,6 +567,19 @@ def codegen_units():
         build_setting_default = -1,
     )
 
+def link_self_contained():
+    """Controls whether Rust links its self-contained CRT objects.
+
+    Zig provides the CRT objects when targeting musl, so rules_rust disables
+    Rust's copies automatically for that toolchain and target combination.
+    Other toolchains can disable them explicitly with:
+        --@rules_rust//rust/settings:link_self_contained=false
+    """
+    bool_flag(
+        name = "link_self_contained",
+        build_setting_default = True,
+    )
+
 # buildifier: disable=unnamed-macro
 def collect_cfgs():
     """Enable collection of cfg flags with results stored in CrateInfo.cfgs.

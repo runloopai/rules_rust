@@ -1,0 +1,3 @@
+load(":link_self_contained_test.bzl", "link_self_contained_test_suite")
+
+link_self_contained_test_suite(name = "link_self_contained_test_suite")

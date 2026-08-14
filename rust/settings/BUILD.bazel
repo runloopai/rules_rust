@@ -28,6 +28,7 @@ load(
     "incompatible_change_clippy_error_format",
     "incompatible_do_not_include_data_in_compile_data",
     "incompatible_do_not_include_transitive_data_in_compile_inputs",
+    "link_self_contained",
     "lto",
     "no_std",
     "per_crate_rustc_flag",
@@ -114,6 +115,8 @@ incompatible_change_clippy_error_format()
 incompatible_do_not_include_data_in_compile_data()
 
 incompatible_do_not_include_transitive_data_in_compile_inputs()
+
+link_self_contained()
 
 lto()
 
