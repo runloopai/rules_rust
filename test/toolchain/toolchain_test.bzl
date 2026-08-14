@@ -71,6 +71,21 @@ def _toolchain_adds_rustc_flags_impl(ctx, crate_type):
         "Missing --sysroot flag or --sysroot does not point to correct sysroot directory",
     )
 
+    if crate_type == "cdylib":
+        linker_args = [arg for arg in action.argv if arg.startswith("--codegen=linker=")]
+        asserts.equals(env, 1, len(linker_args), "Expected exactly one linker argument")
+        asserts.true(
+            env,
+            linker_args[0].endswith("/mock_rust_lld.exe"),
+            "Expected the Rust toolchain linker, got: {}".format(linker_args[0]),
+        )
+        if "--sysroot=bazel-out/cfg/bin/test/toolchain/rust_extra_flags_toolchain" in action.argv:
+            asserts.true(
+                env,
+                linker_args[0].startswith("--codegen=linker=bazel-out/cfg/"),
+                "Expected a path-mapped Rust toolchain linker, got: {}".format(linker_args[0]),
+            )
+
     return analysistest.end(env)
 
 def _toolchain_adds_rustc_flags_lib_impl(ctx):
@@ -92,6 +107,7 @@ toolchain_adds_rustc_flags_shared_lib_test = analysistest.make(
     config_settings = {
         str(Label("//rust/settings:extra_rustc_flags")): [CONFIG_FLAG],
         str(Label("//rust/settings:toolchain_generated_sysroot")): True,
+        str(Label("//rust/settings:toolchain_linker_preference")): "rust",
     },
 )
 
