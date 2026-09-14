@@ -74,6 +74,47 @@ def _test_clippy_aspect_action_has_warnings_flag_test_impl(ctx):
         ],
     )
 
+def _binary_clippy_aspect_uses_metadata_dependencies_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    target = analysistest.target_under_test(env)
+    clippy_action = _find_clippy_action(target.actions)
+
+    library_args = [
+        arg
+        for arg in clippy_action.argv
+        if arg.startswith("--extern=ok_library=")
+    ]
+    asserts.equals(env, 1, len(library_args))
+    asserts.true(env, library_args[0].endswith(".rmeta"), "expected metadata dependency, got " + library_args[0])
+
+    library_inputs = [
+        file
+        for file in clippy_action.inputs.to_list()
+        if file.basename.startswith("libok_library")
+    ]
+    asserts.equals(env, 1, len(library_inputs))
+    asserts.equals(env, "rmeta", library_inputs[0].extension)
+
+    proc_macro_args = [
+        arg
+        for arg in clippy_action.argv
+        if arg.startswith("--extern=ok_proc_macro=")
+    ]
+    asserts.equals(env, 1, len(proc_macro_args))
+    asserts.false(env, proc_macro_args[0].endswith(".rmeta"), "proc macros must remain executable dependencies")
+
+    return analysistest.end(env)
+
+def _clippy_aspect_can_be_disabled_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    target = analysistest.target_under_test(env)
+
+    asserts.equals(env, 0, len([action for action in target.actions if action.mnemonic == "Clippy"]))
+    asserts.equals(env, [], target[OutputGroupInfo].clippy_checks.to_list())
+    asserts.equals(env, [], target[OutputGroupInfo].clippy_output.to_list())
+
+    return analysistest.end(env)
+
 _CLIPPY_EXPLICIT_FLAGS = [
     "-Dwarnings",
     "-A",
@@ -146,6 +187,20 @@ clippy_aspect_with_output_diagnostics_test = make_clippy_aspect_unittest(
     },
 )
 
+binary_clippy_aspect_uses_metadata_dependencies_test = make_clippy_aspect_unittest(
+    _binary_clippy_aspect_uses_metadata_dependencies_test_impl,
+    config_settings = {
+        str(Label("//rust/settings:pipelined_compilation")): True,
+    },
+)
+
+clippy_aspect_can_be_disabled_test = make_clippy_aspect_unittest(
+    _clippy_aspect_can_be_disabled_test_impl,
+    config_settings = {
+        str(Label("//rust/settings:clippy_enabled")): False,
+    },
+)
+
 def clippy_test_suite(name):
     """Entry-point macro called from the BUILD file.
 
@@ -193,6 +248,15 @@ def clippy_test_suite(name):
         target_under_test = Label("//test/clippy:ok_library"),
     )
 
+    binary_clippy_aspect_uses_metadata_dependencies_test(
+        name = "binary_clippy_aspect_uses_metadata_dependencies_test",
+        target_under_test = Label("//test/clippy:ok_binary"),
+    )
+    clippy_aspect_can_be_disabled_test(
+        name = "clippy_aspect_can_be_disabled_test",
+        target_under_test = Label("//test/clippy:ok_binary"),
+    )
+
     native.test_suite(
         name = name,
         tests = [
@@ -205,5 +269,7 @@ def clippy_test_suite(name):
             ":clippy_aspect_without_clippy_error_format_test",
             ":clippy_aspect_with_clippy_error_format_test",
             ":clippy_aspect_with_output_diagnostics_test",
+            ":binary_clippy_aspect_uses_metadata_dependencies_test",
+            ":clippy_aspect_can_be_disabled_test",
         ],
     )

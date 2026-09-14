@@ -645,7 +645,7 @@ def _disambiguate_libs(actions, toolchain, crate_info, dep_info, use_pic):
             visited_libs[name] = artifact
     return ambiguous_libs
 
-def _depend_on_metadata(crate_info, force_depend_on_objects):
+def _depend_on_metadata(crate_info, force_depend_on_objects, force_depend_on_metadata = False):
     """Determines if we can depend on metadata for this crate.
 
     By default (when pipelining is disabled or when the crate type needs to link against
@@ -658,14 +658,18 @@ def _depend_on_metadata(crate_info, force_depend_on_objects):
     Args:
         crate_info (CrateInfo): The Crate to determine this for.
         force_depend_on_objects (bool): if set we will not depend on metadata.
+        force_depend_on_metadata (bool): if set we will use metadata where dependencies provide it,
+            regardless of the current crate type.
 
     Returns:
         Whether we can depend on metadata for this crate.
     """
+    if force_depend_on_objects and force_depend_on_metadata:
+        fail("force_depend_on_objects and force_depend_on_metadata are mutually exclusive")
     if force_depend_on_objects:
         return False
 
-    return crate_info.type in ("rlib", "lib")
+    return force_depend_on_metadata or crate_info.type in ("rlib", "lib")
 
 def collect_inputs(
         ctx,
@@ -681,6 +685,7 @@ def collect_inputs(
         lint_files,
         stamp = False,
         force_depend_on_objects = False,
+        force_depend_on_metadata = False,
         experimental_use_cc_common_link = False,
         include_linker_inputs = False,
         include_link_flags = True):
@@ -703,6 +708,8 @@ def collect_inputs(
             https://docs.bazel.build/versions/main/user-manual.html#flag--stamp
         force_depend_on_objects (bool, optional): Forces dependencies of this rule to be objects rather than
             metadata, even for libraries. This is used in rustdoc tests.
+        force_depend_on_metadata (bool, optional): Uses metadata for dependencies that provide it, even when the
+            current crate type would normally require objects.
         experimental_use_cc_common_link (bool, optional): Whether rules_rust uses cc_common.link to link
             rust binaries.
         include_linker_inputs (bool, optional): Whether to include linker inputs in transitive dependencies.
@@ -746,7 +753,8 @@ def collect_inputs(
     # flattened on each transitive rust_library dependency.
     libs_from_linker_inputs = []
     ambiguous_libs = {}
-    if crate_info.type not in ("lib", "rlib") or include_linker_inputs:
+    use_metadata = _depend_on_metadata(crate_info, force_depend_on_objects, force_depend_on_metadata)
+    if (crate_info.type not in ("lib", "rlib") and not use_metadata) or include_linker_inputs:
         linker_inputs = dep_info.transitive_noncrates.to_list()
         ambiguous_libs = _disambiguate_libs(ctx.actions, toolchain, crate_info, dep_info, use_pic)
         libs_from_linker_inputs = _collect_libs_from_linker_inputs(linker_inputs, use_pic) + [
@@ -761,7 +769,7 @@ def collect_inputs(
     linkstamp_outs = []
 
     transitive_crate_outputs = dep_info.transitive_crate_outputs
-    if _depend_on_metadata(crate_info, force_depend_on_objects):
+    if use_metadata:
         transitive_crate_outputs = dep_info.transitive_metadata_outputs
 
     nolinkstamp_compile_direct_inputs = []
@@ -980,6 +988,7 @@ def construct_arguments(
         use_json_output = False,
         build_metadata = False,
         force_depend_on_objects = False,
+        force_depend_on_metadata = False,
         skip_expanding_rustc_env = False,
         require_explicit_unstable_features = False,
         error_format = None,
@@ -1052,6 +1061,7 @@ def construct_arguments(
         use_json_output (bool): Have rustc emit json and process_wrapper parse json messages to output rendered output.
         build_metadata (bool): Generate CLI arguments for building *only* .rmeta files. This requires use_json_output.
         force_depend_on_objects (bool): Force using `.rlib` object files instead of metadata (`.rmeta`) files even if they are available.
+        force_depend_on_metadata (bool): Use metadata for dependencies that provide it, even when the current crate type would normally require objects.
         skip_expanding_rustc_env (bool): Whether to skip expanding CrateInfo.rustc_env_attr
         require_explicit_unstable_features (bool): Whether to require all unstable features to be explicitly opted in to using `-Zallow-features=...`.
         error_format (str, optional): Error format to pass to the `--error-format` command line argument. If set to None, uses the "_error_format" entry in `attr`.
@@ -1394,7 +1404,7 @@ def construct_arguments(
         if crate_info.type == "dylib" and toolchain.target_os in ["macos", "darwin"]:
             rustc_flags.add("--codegen=link-arg=-Wl,-install_name,@rpath/" + crate_info.output.basename)
 
-    use_metadata = _depend_on_metadata(crate_info, force_depend_on_objects)
+    use_metadata = _depend_on_metadata(crate_info, force_depend_on_objects, force_depend_on_metadata)
 
     # These always need to be added, even if not linking this crate.
     add_crate_link_flags(rustc_flags, dep_info, force_all_deps_direct, use_metadata)

@@ -18,6 +18,8 @@ rust_binary(
     name = "ok_binary",
     srcs = ["src/main.rs"],
     edition = "2018",
+    proc_macro_deps = [":ok_proc_macro"],
+    deps = [":ok_library"],
 )
 
 rust_library(

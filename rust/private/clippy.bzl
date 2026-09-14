@@ -15,6 +15,7 @@
 """A module defining clippy rules"""
 
 load("@bazel_skylib//lib:structs.bzl", "structs")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//rust/private:common.bzl", "rust_common")
 load(
     "//rust/private:lint_test.bzl",
@@ -161,6 +162,7 @@ def rust_clippy_action(ctx, clippy_executable, process_wrapper, crate_info, conf
         dep_info,
         build_info,
         lint_files,
+        force_depend_on_metadata = True,
     )
 
     if clippy_diagnostics_file:
@@ -186,6 +188,7 @@ def rust_clippy_action(ctx, clippy_executable, process_wrapper, crate_info, conf
         build_env_files = build_env_files,
         build_flags_files = build_flags_files,
         emit = ["dep-info", "metadata"],
+        force_depend_on_metadata = True,
         skip_expanding_rustc_env = True,
         use_json_output = bool(clippy_diagnostics_file),
         error_format = error_format,
@@ -245,6 +248,15 @@ def rust_clippy_action(ctx, clippy_executable, process_wrapper, crate_info, conf
     )
 
 def _clippy_aspect_impl(target, ctx):
+    if not ctx.attr._clippy_enabled[BuildSettingInfo].value:
+        return [
+            OutputGroupInfo(
+                clippy_checks = depset([]),
+                clippy_output = depset([]),
+            ),
+            ClippyInfo(output = depset([])),
+        ]
+
     # Exit early if a target already has a clippy output group. This
     # can be useful for rules which always want to inhibit clippy.
     if OutputGroupInfo in target:
@@ -322,6 +334,11 @@ rust_clippy_aspect = aspect(
         "_clippy_error_format": attr.label(
             doc = "The desired `--error-format` flags for clippy",
             default = "//rust/settings:clippy_error_format",
+        ),
+        "_clippy_enabled": attr.label(
+            doc = "Whether the Clippy aspect should register actions",
+            default = Label("//rust/settings:clippy_enabled"),
+            providers = [BuildSettingInfo],
         ),
         "_clippy_flag": attr.label(
             doc = "Arguments to pass to clippy." +

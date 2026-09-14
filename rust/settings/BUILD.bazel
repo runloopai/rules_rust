@@ -3,6 +3,7 @@ load(
     ":settings.bzl",
     "always_enable_metadata_output_groups",
     "capture_clippy_output",
+    "clippy_enabled",
     "clippy_error_format",
     "clippy_flag",
     "clippy_flags",
@@ -66,6 +67,8 @@ bzl_library(
 always_enable_metadata_output_groups()
 
 capture_clippy_output()
+
+clippy_enabled()
 
 clippy_flag()
 

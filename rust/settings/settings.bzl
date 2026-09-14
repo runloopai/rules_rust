@@ -329,6 +329,14 @@ def capture_clippy_output():
     )
 
 # buildifier: disable=unnamed-macro
+def clippy_enabled():
+    """Controls whether the Clippy aspect registers lint actions."""
+    bool_flag(
+        name = "clippy_enabled",
+        build_setting_default = True,
+    )
+
+# buildifier: disable=unnamed-macro
 def no_std():
     """This setting may be used to enable builds without the standard library.
 
