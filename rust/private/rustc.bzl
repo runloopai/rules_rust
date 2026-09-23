@@ -1288,7 +1288,7 @@ def construct_arguments(
 
     emit_without_paths = []
     for kind in emit:
-        if kind == "link" and crate_info.type == "bin":
+        if kind == "link" and crate_info.type == "bin" and crate_info.name != "build_script_build":
             rustc_flags.add(crate_info.output, format = "--emit=link=%s")
         elif type(kind) in ["tuple", "list"] and len(kind) == 2:
             # 'kind' is a (string, File) tuple/list. Passing the File object directly to
@@ -1949,6 +1949,14 @@ def rustc_compile_action(
 
     # The action might generate extra output that we don't want to include in the `DefaultInfo` files.
     action_outputs = list(outputs)
+
+    # Analysis-only compiler drivers may emit a call graph beside binary outputs.
+    # Keep this opt-in sidecar out of executable DefaultInfo and production actions.
+    callgraph = None
+    if ctx.var.get("rust_emit_callgraph", "0") == "1" and crate_info.type == "bin" and crate_info.name != "build_script_build":
+        callgraph = ctx.actions.declare_file(crate_info.output.basename + ".callgraph.json", sibling = crate_info.output)
+        action_outputs.append(callgraph)
+        env["CGA_INPUT"] = json.encode({"extract": True, "lint": None})
     if rustc_output:
         action_outputs.append(rustc_output)
     if profiling_dir:
@@ -2252,6 +2260,8 @@ def rustc_compile_action(
     providers += establish_cc_info(ctx, attr, crate_info, toolchain, cc_toolchain, feature_configuration, interface_library, use_pic, debug_context)
 
     output_group_info = {}
+    if callgraph:
+        output_group_info["rust_callgraph"] = depset([callgraph])
 
     if pdb_file:
         output_group_info["pdb_file"] = depset([pdb_file])
