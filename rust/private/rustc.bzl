@@ -1288,7 +1288,7 @@ def construct_arguments(
 
     emit_without_paths = []
     for kind in emit:
-        if kind == "link" and crate_info.type == "bin" and crate_info.name != "build_script_build":
+        if kind == "link" and crate_info.type == "bin":
             rustc_flags.add(crate_info.output, format = "--emit=link=%s")
         elif type(kind) in ["tuple", "list"] and len(kind) == 2:
             # 'kind' is a (string, File) tuple/list. Passing the File object directly to
